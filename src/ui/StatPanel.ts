@@ -1,13 +1,13 @@
 import { GameState } from "../state/GameState";
 import type { StatKey } from "../data/types";
 
-const STAT_LABELS: { key: StatKey; label: string }[] = [
-  { key: "str", label: "STR" },
-  { key: "agi", label: "AGI" },
-  { key: "vit", label: "VIT" },
-  { key: "int", label: "INT" },
-  { key: "dex", label: "DEX" },
-  { key: "luk", label: "LUK" },
+const STAT_LABELS: { key: StatKey; label: string; description: string }[] = [
+  { key: "str", label: "STR", description: "Raises your attack power — deal more damage per hit." },
+  { key: "agi", label: "AGI", description: "Raises attack speed and your chance to dodge enemy attacks." },
+  { key: "vit", label: "VIT", description: "Raises your max HP — survive more hits before going down." },
+  { key: "int", label: "INT", description: "Raises magic power. Not used in combat yet — saved for a future update." },
+  { key: "dex", label: "DEX", description: "Raises accuracy — your attacks are less likely to miss." },
+  { key: "luk", label: "LUK", description: "Raises your chance to land a critical hit for bonus damage." },
 ];
 
 export function mountStatPanel(root: HTMLElement, gameState: GameState) {
@@ -50,13 +50,21 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
   const statBonusEls = new Map<StatKey, HTMLSpanElement>();
   const statButtonEls = new Map<StatKey, HTMLButtonElement>();
 
-  for (const { key, label } of STAT_LABELS) {
+  for (const { key, label, description } of STAT_LABELS) {
+    const block = document.createElement("div");
+    block.className = "stat-block";
+
     const row = document.createElement("div");
     row.className = "stat-row";
 
     const labelEl = document.createElement("span");
     labelEl.className = "stat-label";
     labelEl.textContent = label;
+
+    const infoBtn = document.createElement("button");
+    infoBtn.className = "stat-info-btn";
+    infoBtn.textContent = "ⓘ";
+    infoBtn.setAttribute("aria-label", `What does ${label} do?`);
 
     const valueEl = document.createElement("span");
     valueEl.className = "stat-value";
@@ -68,8 +76,16 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
     btn.textContent = "+";
     btn.onclick = () => gameState.allocateStat(key);
 
-    row.append(labelEl, valueEl, bonusEl, btn);
-    statRowsEl.appendChild(row);
+    row.append(labelEl, infoBtn, valueEl, bonusEl, btn);
+
+    const descEl = document.createElement("div");
+    descEl.className = "stat-desc";
+    descEl.textContent = description;
+
+    infoBtn.onclick = () => descEl.classList.toggle("visible");
+
+    block.append(row, descEl);
+    statRowsEl.appendChild(block);
 
     statValueEls.set(key, valueEl);
     statBonusEls.set(key, bonusEl);
