@@ -41,7 +41,7 @@ export interface MonsterDefinition {
   goldReward: number;
 }
 
-export type EquipmentSlot = "weapon" | "armor" | "accessory";
+export type EquipmentSlot = "weapon" | "shield" | "armor" | "helmet" | "accessory";
 
 export type EquipmentState = Record<EquipmentSlot, string | null>;
 

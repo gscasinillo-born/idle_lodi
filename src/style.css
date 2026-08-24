@@ -281,17 +281,53 @@ html, body {
 
 .shop-slot-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 8px;
   font-size: 12px;
   font-weight: bold;
   color: #cfd8ff;
-  margin-bottom: 4px;
+  cursor: pointer;
 }
 
 .shop-equipped {
+  flex: 1;
   font-weight: normal;
   color: #9b9bb8;
   font-size: 11px;
+  text-align: right;
+  padding-right: 4px;
+}
+
+.shop-slot-toggle-icon {
+  color: #9b9bb8;
+  font-size: 11px;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.shop-slot:not(.collapsed) .shop-slot-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.shop-slot-items {
+  margin-top: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.shop-slot.collapsed .shop-slot-items {
+  display: none;
+}
+
+.shop-rarity {
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.shop-item-desc {
+  flex: 1;
+  min-width: 0;
 }
 
 .log-section {

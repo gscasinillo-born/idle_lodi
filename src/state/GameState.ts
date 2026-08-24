@@ -1,7 +1,7 @@
 import type { CoreStats, DerivedStats, EquipmentState, SaveData, StatKey } from "../data/types";
 import { deriveStats, expToNextLevel, STAT_POINTS_PER_LEVEL } from "../data/stats";
 import { createNewSave, loadSave, writeSave } from "../systems/SaveManager";
-import { EQUIPMENT_ITEMS, POTION, type EquipmentItem } from "../data/shopItems";
+import { EQUIPMENT_ITEMS, POTION, RARITY_UNLOCK_FLOOR, type EquipmentItem } from "../data/shopItems";
 
 const MAX_LOG_LINES = 40;
 const SAVE_INTERVAL_MS = 5000;
@@ -159,7 +159,12 @@ export class GameState {
     return true;
   }
 
+  isRarityUnlocked(rarity: EquipmentItem["rarity"]): boolean {
+    return this.data.maxFloorReached >= RARITY_UNLOCK_FLOOR[rarity];
+  }
+
   buyEquipment(item: EquipmentItem): boolean {
+    if (!this.isRarityUnlocked(item.rarity)) return false;
     if (this.data.gold < item.cost) return false;
     this.data.gold -= item.cost;
     this.data.equipment[item.slot] = item.id;

@@ -1,9 +1,15 @@
 import { GameState } from "../state/GameState";
-import { EQUIPMENT_ITEMS, POTION, type EquipmentItem } from "../data/shopItems";
+import { EQUIPMENT_ITEMS, POTION, RARITY_COLORS, type EquipmentItem } from "../data/shopItems";
 import type { EquipmentSlot } from "../data/types";
 
-const SLOTS: EquipmentSlot[] = ["weapon", "armor", "accessory"];
-const SLOT_LABELS: Record<EquipmentSlot, string> = { weapon: "Weapon", armor: "Armor", accessory: "Accessory" };
+const SLOTS: EquipmentSlot[] = ["weapon", "shield", "armor", "helmet", "accessory"];
+const SLOT_LABELS: Record<EquipmentSlot, string> = {
+  weapon: "Weapon",
+  shield: "Shield",
+  armor: "Armor",
+  helmet: "Helmet",
+  accessory: "Accessory",
+};
 
 function formatBonus(bonus: EquipmentItem["statBonus"]): string {
   return Object.entries(bonus)
@@ -47,38 +53,56 @@ export function mountShopPanel(root: HTMLElement, gameState: GameState) {
   root.classList.add("collapsed");
   shopHeader.onclick = () => root.classList.toggle("collapsed");
 
+  const slotLabelEls = new Map<EquipmentSlot, HTMLSpanElement>();
   const equippedLabelEls = new Map<EquipmentSlot, HTMLSpanElement>();
   const itemButtonEls = new Map<string, HTMLButtonElement>();
+  const itemRowEls = new Map<string, HTMLDivElement>();
 
   for (const slot of SLOTS) {
+    const items = EQUIPMENT_ITEMS.filter((i) => i.slot === slot).sort((a, b) => a.cost - b.cost);
+
     const section = document.createElement("div");
-    section.className = "shop-slot";
+    section.className = "shop-slot collapsed";
 
     const header = document.createElement("div");
     header.className = "shop-slot-header";
     const slotLabel = document.createElement("span");
-    slotLabel.textContent = SLOT_LABELS[slot];
+    slotLabelEls.set(slot, slotLabel);
     const equippedLabel = document.createElement("span");
     equippedLabel.className = "shop-equipped";
-    header.append(slotLabel, equippedLabel);
+    const toggleIcon = document.createElement("span");
+    toggleIcon.className = "shop-slot-toggle-icon";
+    toggleIcon.textContent = "▸";
+    header.append(slotLabel, equippedLabel, toggleIcon);
+    header.onclick = () => section.classList.toggle("collapsed");
     section.appendChild(header);
     equippedLabelEls.set(slot, equippedLabel);
 
-    for (const item of EQUIPMENT_ITEMS.filter((i) => i.slot === slot)) {
+    const itemsEl = document.createElement("div");
+    itemsEl.className = "shop-slot-items";
+
+    for (const item of items) {
       const row = document.createElement("div");
       row.className = "shop-item-row";
 
       const desc = document.createElement("span");
-      desc.textContent = `${item.name} (${formatBonus(item.statBonus)})`;
+      desc.className = "shop-item-desc";
+      const rarityTag = document.createElement("span");
+      rarityTag.className = "shop-rarity";
+      rarityTag.style.color = RARITY_COLORS[item.rarity];
+      rarityTag.textContent = item.rarity;
+      desc.append(`${item.name} `, rarityTag, ` (${formatBonus(item.statBonus)})`);
 
       const btn = document.createElement("button");
       btn.onclick = () => gameState.buyEquipment(item);
 
       row.append(desc, btn);
-      section.appendChild(row);
+      itemsEl.appendChild(row);
       itemButtonEls.set(item.id, btn);
+      itemRowEls.set(item.id, row);
     }
 
+    section.appendChild(itemsEl);
     equipmentSlotsEl.appendChild(section);
   }
 
@@ -90,16 +114,25 @@ export function mountShopPanel(root: HTMLElement, gameState: GameState) {
     for (const slot of SLOTS) {
       const equippedId = gameState.equipment[slot];
       const equippedItem = EQUIPMENT_ITEMS.find((i) => i.id === equippedId);
-      const currentTier = equippedItem?.tier ?? 0;
       equippedLabelEls.get(slot)!.textContent = equippedItem ? `Equipped: ${equippedItem.name}` : "Equipped: None";
 
-      for (const item of EQUIPMENT_ITEMS.filter((i) => i.slot === slot)) {
+      const slotItems = EQUIPMENT_ITEMS.filter((i) => i.slot === slot);
+      let unlockedCount = 0;
+
+      for (const item of slotItems) {
+        const unlocked = gameState.isRarityUnlocked(item.rarity);
+        if (unlocked) unlockedCount += 1;
+        itemRowEls.get(item.id)!.style.display = unlocked ? "" : "none";
+
         const btn = itemButtonEls.get(item.id)!;
         const isEquipped = item.id === equippedId;
-        const isOwnedOrWorse = item.tier <= currentTier;
-        btn.disabled = isOwnedOrWorse || gameState.gold < item.cost;
-        btn.textContent = isEquipped ? "Equipped" : isOwnedOrWorse ? "Owned better" : `${item.cost}g`;
+        btn.disabled = isEquipped || gameState.gold < item.cost;
+        btn.textContent = isEquipped ? "Equipped" : `${item.cost}g`;
       }
+
+      const label = SLOT_LABELS[slot];
+      slotLabelEls.get(slot)!.textContent =
+        unlockedCount < slotItems.length ? `${label} (${unlockedCount}/${slotItems.length})` : `${label} (${slotItems.length})`;
     }
   }
 
