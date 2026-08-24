@@ -183,6 +183,39 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private popupCombatText(target: Positioned, kind: "miss" | "hit" | "crit", amount?: number) {
+    const baseX = target.x + Phaser.Math.Between(-10, 10);
+    const baseY = target.y - target.displayHeight / 2 - 34;
+
+    const style =
+      kind === "miss"
+        ? { text: "MISS", color: "#aaaaaa", fontSize: "16px", fontStyle: "italic" }
+        : kind === "crit"
+          ? { text: `-${amount} CRITICAL!`, color: "#ffcc33", fontSize: "22px", fontStyle: "bold" }
+          : { text: `-${amount}`, color: "#ffffff", fontSize: "18px", fontStyle: "normal" };
+
+    const label = this.add
+      .text(baseX, baseY, style.text, {
+        fontFamily: "monospace",
+        fontSize: style.fontSize,
+        fontStyle: style.fontStyle,
+        color: style.color,
+        stroke: "#000000",
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(10);
+
+    this.tweens.add({
+      targets: label,
+      y: baseY - 36,
+      alpha: 0,
+      duration: 750,
+      ease: "Cubic.easeOut",
+      onComplete: () => label.destroy(),
+    });
+  }
+
   private drawBar(gfx: Phaser.GameObjects.Graphics, sprite: Positioned, hp: number, maxHp: number, color: number) {
     const barWidth = 100;
     const barHeight = 10;
@@ -232,16 +265,20 @@ export class GameScene extends Phaser.Scene {
     if (isPlayerAttacking) this.playHeroAction("attack");
     else this.playMonsterAction("attack");
 
+    const targetSprite = isPlayerAttacking ? this.monsterSprite : this.playerSprite;
+
     const hitChance = Phaser.Math.Clamp((hit - targetFlee + 100) / 200, 0.15, 0.95);
     const didHit = Math.random() < hitChance;
 
     if (!didHit) {
+      this.popupCombatText(targetSprite, "miss");
       this.gameState.addLog(isPlayerAttacking ? "You missed." : `${this.monster.name} missed.`);
       return;
     }
 
     const isCrit = Math.random() * 100 < (isPlayerAttacking ? this.gameState.derived.crit : deriveStats(this.monster.level, this.monster.stats).crit);
     const damage = Math.max(1, Math.floor(atk * (isCrit ? 1.75 : 1) * Phaser.Math.FloatBetween(0.85, 1.15)));
+    this.popupCombatText(targetSprite, isCrit ? "crit" : "hit", damage);
 
     if (isPlayerAttacking) {
       this.monsterHp = Math.max(0, this.monsterHp - damage);
