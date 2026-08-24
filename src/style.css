@@ -58,6 +58,20 @@ html, body {
   margin: 0 0 8px;
 }
 
+.shop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shop-header h2 {
+  margin: 0 0 8px;
+}
+
+.shop-toggle-icon {
+  display: none;
+}
+
 /* Below this width the side-by-side layout leaves too little room for the
    game canvas — stack everything vertically instead, game first. */
 @media (max-width: 700px) {
@@ -88,6 +102,26 @@ html, body {
     border-top: 2px solid #322f42;
     order: 3;
   }
+
+  /* Collapsible only matters here — on desktop the shop always stays expanded. */
+  .shop-header {
+    cursor: pointer;
+  }
+
+  .shop-toggle-icon {
+    display: inline-block;
+    color: #9b9bb8;
+    font-size: 12px;
+    transition: transform 0.15s ease;
+  }
+
+  #shop-sidebar:not(.collapsed) .shop-toggle-icon {
+    transform: rotate(90deg);
+  }
+
+  #shop-sidebar.collapsed .shop-content {
+    display: none;
+  }
 }
 
 .panel-section {
@@ -112,6 +146,37 @@ html, body {
 #char-summary div {
   margin-bottom: 4px;
   font-size: 13px;
+}
+
+.floor-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.floor-nav span {
+  flex: 1;
+  text-align: center;
+}
+
+.floor-nav button {
+  padding: 4px 10px;
+  border: 1px solid #4f9dff;
+  background: #1e2a3f;
+  color: #4f9dff;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.floor-nav button:disabled {
+  border-color: #444;
+  color: #555;
+  cursor: default;
 }
 
 .small {

@@ -15,6 +15,11 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
     <div class="panel-section">
       <h1>Idle Lodi</h1>
       <div id="char-summary"></div>
+      <div class="floor-nav">
+        <button id="floor-down">Down</button>
+        <span id="floor-label"></span>
+        <button id="floor-up">Up</button>
+      </div>
     </div>
     <div class="panel-section">
       <h2>Stats <span id="stat-points"></span></h2>
@@ -30,6 +35,12 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
   const statPointsEl = root.querySelector<HTMLSpanElement>("#stat-points")!;
   const statRowsEl = root.querySelector<HTMLDivElement>("#stat-rows")!;
   const logEl = root.querySelector<HTMLDivElement>("#log-lines")!;
+  const floorLabelEl = root.querySelector<HTMLSpanElement>("#floor-label")!;
+  const floorDownBtn = root.querySelector<HTMLButtonElement>("#floor-down")!;
+  const floorUpBtn = root.querySelector<HTMLButtonElement>("#floor-up")!;
+
+  floorDownBtn.onclick = () => gameState.goDownFloor();
+  floorUpBtn.onclick = () => gameState.goUpFloor();
 
   // Built once and updated in place — rebuilding these nodes on every state
   // change (e.g. the per-frame regen tick) can drop a click that lands
@@ -73,8 +84,11 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
       <div class="small">${Math.floor(gameState.exp)} / ${gameState.expToNext} EXP</div>
       <div>HP: ${Math.ceil(gameState.hp)} / ${derived.maxHp}</div>
       <div>Gold: ${gameState.gold}</div>
-      <div>Floor: ${gameState.floor}</div>
     `;
+
+    floorLabelEl.textContent = `Floor: ${gameState.floor} / ${gameState.maxFloorReached}`;
+    floorDownBtn.disabled = gameState.floor <= 1;
+    floorUpBtn.disabled = gameState.floor >= gameState.maxFloorReached;
 
     statPointsEl.textContent = gameState.statPoints > 0 ? `(${gameState.statPoints} points)` : "";
 

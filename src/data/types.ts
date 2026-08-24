@@ -48,6 +48,8 @@ export type EquipmentState = Record<EquipmentSlot, string | null>;
 export interface SaveData {
   version: number;
   floor: number;
+  /** Deepest floor number ever reached — caps manual navigation upward. */
+  maxFloorReached: number;
   level: number;
   exp: number;
   expToNext: number;

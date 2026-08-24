@@ -13,20 +13,26 @@ function formatBonus(bonus: EquipmentItem["statBonus"]): string {
 
 export function mountShopPanel(root: HTMLElement, gameState: GameState) {
   root.innerHTML = `
-    <h2>Shop</h2>
-    <div class="shop-item-row">
-      <span>${POTION.name} — heals ${Math.round(POTION.healPercent * 100)}% HP</span>
+    <div class="shop-header" id="shop-toggle">
+      <h2>Shop</h2>
+      <span class="shop-toggle-icon">▸</span>
     </div>
-    <div class="shop-item-row">
-      <span id="potion-count"></span>
-      <div class="shop-actions">
-        <button id="buy-potion">Buy ${POTION.cost}g</button>
-        <button id="use-potion">Use</button>
+    <div class="shop-content">
+      <div class="shop-item-row">
+        <span>${POTION.name} — heals ${Math.round(POTION.healPercent * 100)}% HP</span>
       </div>
+      <div class="shop-item-row">
+        <span id="potion-count"></span>
+        <div class="shop-actions">
+          <button id="buy-potion">Buy ${POTION.cost}g</button>
+          <button id="use-potion">Use</button>
+        </div>
+      </div>
+      <div id="equipment-slots"></div>
     </div>
-    <div id="equipment-slots"></div>
   `;
 
+  const shopHeader = root.querySelector<HTMLDivElement>("#shop-toggle")!;
   const potionCountEl = root.querySelector<HTMLSpanElement>("#potion-count")!;
   const buyPotionBtn = root.querySelector<HTMLButtonElement>("#buy-potion")!;
   const usePotionBtn = root.querySelector<HTMLButtonElement>("#use-potion")!;
@@ -34,6 +40,12 @@ export function mountShopPanel(root: HTMLElement, gameState: GameState) {
 
   buyPotionBtn.onclick = () => gameState.buyPotion();
   usePotionBtn.onclick = () => gameState.usePotion();
+
+  // Collapse/expand only has a visible effect on the mobile layout (see
+  // media query) — defaults to collapsed so the shop doesn't dominate the
+  // small screen before the player scrolls to it.
+  root.classList.add("collapsed");
+  shopHeader.onclick = () => root.classList.toggle("collapsed");
 
   const equippedLabelEls = new Map<EquipmentSlot, HTMLSpanElement>();
   const itemButtonEls = new Map<string, HTMLButtonElement>();

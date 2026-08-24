@@ -11,14 +11,19 @@ type Listener = () => void;
 export class GameState {
   private data: SaveData;
   private listeners: Listener[] = [];
+  // Separate from onChange: only fires for manual floor navigation, so GameScene can
+  // respawn the encounter immediately without disturbing the paced delay used after combat.
+  private floorJumpListeners: Listener[] = [];
   private saveTimer = 0;
 
   constructor() {
     this.data = loadSave();
     if (this.data.hp <= 0) this.data.hp = this.derived.maxHp;
+    if (this.data.maxFloorReached < this.data.floor) this.data.maxFloorReached = this.data.floor;
   }
 
   get floor() { return this.data.floor; }
+  get maxFloorReached() { return this.data.maxFloorReached; }
   get level() { return this.data.level; }
   get exp() { return this.data.exp; }
   get expToNext() { return this.data.expToNext; }
@@ -50,6 +55,11 @@ export class GameState {
   onChange(listener: Listener): () => void {
     this.listeners.push(listener);
     return () => { this.listeners = this.listeners.filter((l) => l !== listener); };
+  }
+
+  onFloorJump(listener: Listener): () => void {
+    this.floorJumpListeners.push(listener);
+    return () => { this.floorJumpListeners = this.floorJumpListeners.filter((l) => l !== listener); };
   }
 
   private notify() {
@@ -105,12 +115,31 @@ export class GameState {
 
   advanceFloor() {
     this.data.floor += 1;
+    if (this.data.floor > this.data.maxFloorReached) this.data.maxFloorReached = this.data.floor;
     this.notify();
   }
 
   retreatFloor() {
     this.data.floor = Math.max(1, this.data.floor - 1);
     this.notify();
+  }
+
+  /** Manually step to a higher floor number — only within floors already cleared before. */
+  goUpFloor(): boolean {
+    if (this.data.floor >= this.data.maxFloorReached) return false;
+    this.data.floor += 1;
+    this.addLog(`Moved up to floor ${this.data.floor}.`);
+    this.floorJumpListeners.forEach((l) => l());
+    return true;
+  }
+
+  /** Manually step to a lower floor number — always allowed since it's already been passed through. */
+  goDownFloor(): boolean {
+    if (this.data.floor <= 1) return false;
+    this.data.floor -= 1;
+    this.addLog(`Moved down to floor ${this.data.floor}.`);
+    this.floorJumpListeners.forEach((l) => l());
+    return true;
   }
 
   buyPotion(): boolean {

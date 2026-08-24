@@ -2,13 +2,14 @@ import type { SaveData } from "../data/types";
 import { createBaseStats, expToNextLevel } from "../data/stats";
 
 const STORAGE_KEY = "idle-lodi-save-v1";
-// Bumped for the shop/equipment schema addition — older saves reset cleanly rather than load with missing fields.
-const SAVE_VERSION = 2;
+// Bumped for the floor-navigation schema addition — older saves reset cleanly rather than load with missing fields.
+const SAVE_VERSION = 3;
 
 export function createNewSave(): SaveData {
   return {
     version: SAVE_VERSION,
     floor: 1,
+    maxFloorReached: 1,
     level: 1,
     exp: 0,
     expToNext: expToNextLevel(1),

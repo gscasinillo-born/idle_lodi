@@ -121,6 +121,7 @@ export class GameScene extends Phaser.Scene {
     this.spawnFloor();
 
     this.gameState.onChange(() => this.refreshBars());
+    this.gameState.onFloorJump(() => this.spawnFloor());
   }
 
   private createAnimSet(textureKey: string, sets: AnimSets) {
