@@ -8,6 +8,8 @@ export interface MonsterTemplate {
   unlockFloor: number;
   /** Multiplier applied to each stat's floor-based growth, giving each monster a distinct archetype. */
   statWeights: CoreStats;
+  /** Pixel size of one animation frame in the sprite sheet (same 4x12 grid layout either way). Defaults to 32. */
+  frameSize?: number;
 }
 
 // Regular monsters accumulate as you descend — deeper floors mix tougher
@@ -73,6 +75,7 @@ export const REGULAR_TEMPLATES: MonsterTemplate[] = [
 
 // Bosses cycle through this list every BOSS_FLOOR_INTERVAL floors, growing
 // stronger each pass because stat scaling is still driven by floor depth.
+// Boss sheets are drawn at double resolution (64px frames vs. 32px for regular monsters).
 export const BOSS_TEMPLATES: MonsterTemplate[] = [
   {
     id: "pit-warden",
@@ -80,6 +83,7 @@ export const BOSS_TEMPLATES: MonsterTemplate[] = [
     color: 0xd33131,
     unlockFloor: 10,
     statWeights: { str: 1.3, agi: 0.8, vit: 1.5, int: 0.6, dex: 1.0, luk: 0.8 },
+    frameSize: 64,
   },
   {
     id: "the-devourer",
@@ -87,6 +91,7 @@ export const BOSS_TEMPLATES: MonsterTemplate[] = [
     color: 0x8b0000,
     unlockFloor: 10,
     statWeights: { str: 1.7, agi: 0.9, vit: 1.1, int: 0.5, dex: 1.0, luk: 0.9 },
+    frameSize: 64,
   },
   {
     id: "ashen-colossus",
@@ -94,6 +99,7 @@ export const BOSS_TEMPLATES: MonsterTemplate[] = [
     color: 0x5c5c5c,
     unlockFloor: 10,
     statWeights: { str: 1.2, agi: 0.5, vit: 2.0, int: 0.5, dex: 0.7, luk: 0.5 },
+    frameSize: 64,
   },
   {
     id: "root-tyrant",
@@ -101,6 +107,7 @@ export const BOSS_TEMPLATES: MonsterTemplate[] = [
     color: 0x2e7d32,
     unlockFloor: 10,
     statWeights: { str: 1.2, agi: 0.8, vit: 1.1, int: 0.6, dex: 1.5, luk: 1.4 },
+    frameSize: 64,
   },
   {
     id: "depth-sovereign",
@@ -108,5 +115,6 @@ export const BOSS_TEMPLATES: MonsterTemplate[] = [
     color: 0x4a148c,
     unlockFloor: 10,
     statWeights: { str: 1.4, agi: 1.3, vit: 1.4, int: 1.2, dex: 1.3, luk: 1.2 },
+    frameSize: 64,
   },
 ];

@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { GameState } from "../state/GameState";
 import { deriveStats } from "../data/stats";
 import { generateFloorMonster, isBossFloor } from "../systems/FloorGenerator";
-import { REGULAR_TEMPLATES } from "../data/monsterTemplates";
+import { BOSS_TEMPLATES, REGULAR_TEMPLATES } from "../data/monsterTemplates";
 import type { MonsterDefinition } from "../data/types";
 import { ensureCircleTexture } from "../utils/textures";
 
@@ -29,6 +29,11 @@ const MONSTER_ANIM_SETS: AnimSets = {
   attack: { row: 4, rate: 11, repeat: 0 },
   hurt: { row: 8, rate: 10, repeat: 0 },
 };
+
+// Regular monsters and bosses share the same sheet format, so both are loaded
+// and animated the same way — a missing file (e.g. no boss art yet) is caught
+// per-monster at spawn time via textures.exists(), not here.
+const ALL_MONSTER_TEMPLATES = [...REGULAR_TEMPLATES, ...BOSS_TEMPLATES];
 
 interface Positioned {
   x: number;
@@ -61,9 +66,15 @@ export class GameScene extends Phaser.Scene {
 
   preload() {
     this.load.spritesheet("hero", "/sprites/characters/hero.png", { frameWidth: 32, frameHeight: 32 });
-    for (const template of REGULAR_TEMPLATES) {
-      this.load.spritesheet(template.id, `/sprites/monsters/${template.id}.png`, { frameWidth: 32, frameHeight: 32 });
+    for (const template of ALL_MONSTER_TEMPLATES) {
+      const size = template.frameSize ?? 32;
+      this.load.spritesheet(template.id, `/sprites/monsters/${template.id}.png`, { frameWidth: size, frameHeight: size });
     }
+    // A monster template with no art file yet (e.g. a boss before its sprite is added)
+    // 404s harmlessly here — spawnFloor() falls back to a generated blob for it.
+    this.load.on("loaderror", (file: { key: string }) => {
+      console.warn(`No sprite sheet found for "${file.key}" — falling back to a blob.`);
+    });
   }
 
   create() {
@@ -84,7 +95,9 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     this.createAnimSet("hero", HERO_ANIM_SETS);
-    for (const template of REGULAR_TEMPLATES) this.createAnimSet(template.id, MONSTER_ANIM_SETS);
+    for (const template of ALL_MONSTER_TEMPLATES) {
+      if (this.textures.exists(template.id)) this.createAnimSet(template.id, MONSTER_ANIM_SETS);
+    }
 
     this.playerSprite = this.add.sprite(width * 0.28, height * 0.58, "hero", BOOTSTRAP_FRAME);
     this.playerSprite.setDisplaySize(PLAYER_RADIUS * 2, PLAYER_RADIUS * 2);
@@ -183,16 +196,19 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private popupCombatText(target: Positioned, kind: "miss" | "hit" | "crit", amount?: number) {
+  private popupCombatText(target: Positioned, kind: "miss" | "hit" | "crit", isPlayerAttacking: boolean, amount?: number) {
     const baseX = target.x + Phaser.Math.Between(-10, 10);
     const baseY = target.y - target.displayHeight / 2 - 34;
 
+    // The player's own miss renders red; the enemy's miss stays neutral gray.
+    // Damage the player TAKES renders red; damage the player DEALS stays neutral white.
+    const redColor = "#ff5555";
     const style =
       kind === "miss"
-        ? { text: "MISS", color: "#aaaaaa", fontSize: "16px", fontStyle: "italic" }
+        ? { text: "MISS", color: isPlayerAttacking ? redColor : "#aaaaaa", fontSize: "16px", fontStyle: "italic" }
         : kind === "crit"
           ? { text: `-${amount} CRITICAL!`, color: "#ffcc33", fontSize: "22px", fontStyle: "bold" }
-          : { text: `-${amount}`, color: "#ffffff", fontSize: "18px", fontStyle: "normal" };
+          : { text: `-${amount}`, color: isPlayerAttacking ? "#ffffff" : redColor, fontSize: "18px", fontStyle: "normal" };
 
     const label = this.add
       .text(baseX, baseY, style.text, {
@@ -271,14 +287,14 @@ export class GameScene extends Phaser.Scene {
     const didHit = Math.random() < hitChance;
 
     if (!didHit) {
-      this.popupCombatText(targetSprite, "miss");
+      this.popupCombatText(targetSprite, "miss", isPlayerAttacking);
       this.gameState.addLog(isPlayerAttacking ? "You missed." : `${this.monster.name} missed.`);
       return;
     }
 
     const isCrit = Math.random() * 100 < (isPlayerAttacking ? this.gameState.derived.crit : deriveStats(this.monster.level, this.monster.stats).crit);
     const damage = Math.max(1, Math.floor(atk * (isCrit ? 1.75 : 1) * Phaser.Math.FloatBetween(0.85, 1.15)));
-    this.popupCombatText(targetSprite, isCrit ? "crit" : "hit", damage);
+    this.popupCombatText(targetSprite, isCrit ? "crit" : "hit", isPlayerAttacking, damage);
 
     if (isPlayerAttacking) {
       this.monsterHp = Math.max(0, this.monsterHp - damage);
