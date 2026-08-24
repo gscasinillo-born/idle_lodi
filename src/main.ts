@@ -9,7 +9,7 @@ const gameState = new GameState();
 
 const uiPanel = document.querySelector<HTMLDivElement>("#ui-panel")!;
 mountStatPanel(uiPanel, gameState);
-mountShopPanel(document.querySelector<HTMLDivElement>("#shop-panel")!, gameState);
+mountShopPanel(document.querySelector<HTMLDivElement>("#shop-sidebar")!, gameState);
 
 const gameContainer = document.querySelector<HTMLDivElement>("#game-container")!;
 

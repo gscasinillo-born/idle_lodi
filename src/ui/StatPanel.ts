@@ -20,7 +20,6 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
       <h2>Stats <span id="stat-points"></span></h2>
       <div id="stat-rows"></div>
     </div>
-    <div class="panel-section" id="shop-panel"></div>
     <div class="panel-section log-section">
       <h2>Log</h2>
       <div id="log-lines"></div>
@@ -37,6 +36,7 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
   // mid-teardown, since the element under the cursor gets swapped out
   // between mousedown and mouseup.
   const statValueEls = new Map<StatKey, HTMLSpanElement>();
+  const statBonusEls = new Map<StatKey, HTMLSpanElement>();
   const statButtonEls = new Map<StatKey, HTMLButtonElement>();
 
   for (const { key, label } of STAT_LABELS) {
@@ -50,14 +50,18 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
     const valueEl = document.createElement("span");
     valueEl.className = "stat-value";
 
+    const bonusEl = document.createElement("span");
+    bonusEl.className = "stat-bonus";
+
     const btn = document.createElement("button");
     btn.textContent = "+";
     btn.onclick = () => gameState.allocateStat(key);
 
-    row.append(labelEl, valueEl, btn);
+    row.append(labelEl, valueEl, bonusEl, btn);
     statRowsEl.appendChild(row);
 
     statValueEls.set(key, valueEl);
+    statBonusEls.set(key, bonusEl);
     statButtonEls.set(key, btn);
   }
 
@@ -74,8 +78,12 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
 
     statPointsEl.textContent = gameState.statPoints > 0 ? `(${gameState.statPoints} points)` : "";
 
+    const effectiveStats = gameState.effectiveStats;
     for (const { key } of STAT_LABELS) {
-      statValueEls.get(key)!.textContent = String(gameState.stats[key]);
+      const base = gameState.stats[key];
+      const bonus = effectiveStats[key] - base;
+      statValueEls.get(key)!.textContent = String(base);
+      statBonusEls.get(key)!.textContent = bonus > 0 ? `(+${bonus})` : "";
       statButtonEls.get(key)!.disabled = gameState.statPoints <= 0;
     }
 
