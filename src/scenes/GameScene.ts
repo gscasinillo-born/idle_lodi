@@ -2,19 +2,31 @@ import Phaser from "phaser";
 import { GameState } from "../state/GameState";
 import { deriveStats } from "../data/stats";
 import { generateFloorMonster, isBossFloor } from "../systems/FloorGenerator";
+import { REGULAR_TEMPLATES } from "../data/monsterTemplates";
 import type { MonsterDefinition } from "../data/types";
 import { ensureCircleTexture } from "../utils/textures";
 
 const PLAYER_RADIUS = 48;
 const BOOTSTRAP_FRAME = 0;
 
-// The player always faces the monster on the right, so only the "right"
-// row of each animation set is ever played.
+type AnimSets = Record<string, { row: number; rate: number; repeat: number }>;
+
+// Shared 4-column x 12-row layout: walk/attack/hurt rows, each x 4 directions x 4 frames.
+const DIRS = ["down", "left", "right", "up"];
+
+// The player always faces the monster on the right; monsters always face the player on the left.
 const HERO_FACING = "right";
-const HERO_DIRS = ["down", "left", "right", "up"];
-const HERO_ANIM_SETS: Record<string, { row: number; rate: number; repeat: number }> = {
+const MONSTER_FACING = "left";
+
+const HERO_ANIM_SETS: AnimSets = {
   walk: { row: 0, rate: 8, repeat: -1 },
   attack: { row: 4, rate: 12, repeat: 0 },
+  hurt: { row: 8, rate: 10, repeat: 0 },
+};
+
+const MONSTER_ANIM_SETS: AnimSets = {
+  walk: { row: 0, rate: 7, repeat: -1 },
+  attack: { row: 4, rate: 11, repeat: 0 },
   hurt: { row: 8, rate: 10, repeat: 0 },
 };
 
@@ -34,7 +46,8 @@ export class GameScene extends Phaser.Scene {
   private combatOver = false;
 
   private playerSprite!: Phaser.GameObjects.Sprite;
-  private monsterSprite!: Phaser.GameObjects.Image;
+  private monsterSprite!: Phaser.GameObjects.Sprite;
+  private monsterHasSprite = false;
   private playerHpBar!: Phaser.GameObjects.Graphics;
   private monsterHpBar!: Phaser.GameObjects.Graphics;
   private floorText!: Phaser.GameObjects.Text;
@@ -48,6 +61,9 @@ export class GameScene extends Phaser.Scene {
 
   preload() {
     this.load.spritesheet("hero", "/sprites/characters/hero.png", { frameWidth: 32, frameHeight: 32 });
+    for (const template of REGULAR_TEMPLATES) {
+      this.load.spritesheet(template.id, `/sprites/monsters/${template.id}.png`, { frameWidth: 32, frameHeight: 32 });
+    }
   }
 
   create() {
@@ -67,7 +83,9 @@ export class GameScene extends Phaser.Scene {
       color: "#ff5555",
     }).setOrigin(0.5);
 
-    this.createHeroAnimations();
+    this.createAnimSet("hero", HERO_ANIM_SETS);
+    for (const template of REGULAR_TEMPLATES) this.createAnimSet(template.id, MONSTER_ANIM_SETS);
+
     this.playerSprite = this.add.sprite(width * 0.28, height * 0.58, "hero", BOOTSTRAP_FRAME);
     this.playerSprite.setDisplaySize(PLAYER_RADIUS * 2, PLAYER_RADIUS * 2);
     this.playerSprite.play(`hero-walk-${HERO_FACING}`);
@@ -79,7 +97,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Placeholder texture — spawnFloor() below swaps it to the real monster texture before the first render.
-    this.monsterSprite = this.add.image(width * 0.72, height * 0.58, "hero", BOOTSTRAP_FRAME);
+    this.monsterSprite = this.add.sprite(width * 0.72, height * 0.58, "hero", BOOTSTRAP_FRAME);
     this.monsterHpBar = this.add.graphics();
     this.monsterNameText = this.add.text(width * 0.72, height * 0.58 + PLAYER_RADIUS + 18, "", {
       fontFamily: "monospace",
@@ -92,15 +110,15 @@ export class GameScene extends Phaser.Scene {
     this.gameState.onChange(() => this.refreshBars());
   }
 
-  private createHeroAnimations() {
-    for (const [set, cfg] of Object.entries(HERO_ANIM_SETS)) {
-      HERO_DIRS.forEach((dir, i) => {
-        const key = `hero-${set}-${dir}`;
+  private createAnimSet(textureKey: string, sets: AnimSets) {
+    for (const [set, cfg] of Object.entries(sets)) {
+      DIRS.forEach((dir, i) => {
+        const key = `${textureKey}-${set}-${dir}`;
         if (this.anims.exists(key)) return;
         const start = (cfg.row + i) * 4;
         this.anims.create({
           key,
-          frames: this.anims.generateFrameNumbers("hero", { start, end: start + 3 }),
+          frames: this.anims.generateFrameNumbers(textureKey, { start, end: start + 3 }),
           frameRate: cfg.rate,
           repeat: cfg.repeat,
         });
@@ -116,6 +134,19 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private playMonsterAction(action: "attack" | "hurt") {
+    if (!this.monsterHasSprite) return;
+    const monsterId = this.monster.id;
+    const key = `${monsterId}-${action}-${MONSTER_FACING}`;
+    this.monsterSprite.play(key);
+    this.monsterSprite.once(`animationcomplete-${key}`, () => {
+      // A one-shot anim can outlive its monster (e.g. a killing blow right before
+      // the next floor spawns) — don't stomp whatever's showing by then.
+      if (this.monster.id !== monsterId) return;
+      this.monsterSprite.play(`${monsterId}-walk-${MONSTER_FACING}`);
+    });
+  }
+
   private spawnFloor() {
     this.combatOver = false;
     this.playerAttackAcc = 0;
@@ -124,9 +155,17 @@ export class GameScene extends Phaser.Scene {
     this.monsterHp = this.monster.hp;
 
     const radius = this.monster.isBoss ? 64 : 44;
-    const texKey = `monster-${this.monster.color}-${radius}`;
-    ensureCircleTexture(this, texKey, this.monster.color, radius);
-    this.monsterSprite.setTexture(texKey);
+    // Bosses don't have art yet, so they fall back to a generated blob texture.
+    this.monsterHasSprite = this.textures.exists(this.monster.id);
+    if (this.monsterHasSprite) {
+      this.monsterSprite.play(`${this.monster.id}-walk-${MONSTER_FACING}`);
+    } else {
+      const texKey = `monster-${this.monster.color}-${radius}`;
+      ensureCircleTexture(this, texKey, this.monster.color, radius);
+      this.monsterSprite.stop();
+      this.monsterSprite.setTexture(texKey);
+    }
+    this.monsterSprite.setDisplaySize(radius * 2, radius * 2);
 
     this.monsterNameText.setText(`${this.monster.name} (Lv.${this.monster.level})`);
     this.floorText.setText(`Floor ${this.gameState.floor}`);
@@ -191,6 +230,7 @@ export class GameScene extends Phaser.Scene {
 
   private resolveAttack(atk: number, hit: number, targetFlee: number, isPlayerAttacking: boolean) {
     if (isPlayerAttacking) this.playHeroAction("attack");
+    else this.playMonsterAction("attack");
 
     const hitChance = Phaser.Math.Clamp((hit - targetFlee + 100) / 200, 0.15, 0.95);
     const didHit = Math.random() < hitChance;
@@ -205,6 +245,7 @@ export class GameScene extends Phaser.Scene {
 
     if (isPlayerAttacking) {
       this.monsterHp = Math.max(0, this.monsterHp - damage);
+      this.playMonsterAction("hurt");
       this.gameState.addLog(`You hit ${this.monster.name} for ${damage}${isCrit ? " (CRIT)" : ""}.`);
       if (this.monsterHp <= 0) this.onMonsterDefeated();
     } else {
