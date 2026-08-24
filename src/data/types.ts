@@ -41,6 +41,10 @@ export interface MonsterDefinition {
   goldReward: number;
 }
 
+export type EquipmentSlot = "weapon" | "armor" | "accessory";
+
+export type EquipmentState = Record<EquipmentSlot, string | null>;
+
 export interface SaveData {
   version: number;
   floor: number;
@@ -52,4 +56,6 @@ export interface SaveData {
   stats: CoreStats;
   hp: number;
   log: string[];
+  potions: number;
+  equipment: EquipmentState;
 }

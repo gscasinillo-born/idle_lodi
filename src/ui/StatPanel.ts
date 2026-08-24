@@ -20,6 +20,7 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
       <h2>Stats <span id="stat-points"></span></h2>
       <div id="stat-rows"></div>
     </div>
+    <div class="panel-section" id="shop-panel"></div>
     <div class="panel-section log-section">
       <h2>Log</h2>
       <div id="log-lines"></div>

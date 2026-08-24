@@ -2,7 +2,8 @@ import type { SaveData } from "../data/types";
 import { createBaseStats, expToNextLevel } from "../data/stats";
 
 const STORAGE_KEY = "idle-lodi-save-v1";
-const SAVE_VERSION = 1;
+// Bumped for the shop/equipment schema addition — older saves reset cleanly rather than load with missing fields.
+const SAVE_VERSION = 2;
 
 export function createNewSave(): SaveData {
   return {
@@ -16,6 +17,8 @@ export function createNewSave(): SaveData {
     stats: createBaseStats(),
     hp: 1,
     log: [],
+    potions: 0,
+    equipment: { weapon: null, armor: null, accessory: null },
   };
 }
 
