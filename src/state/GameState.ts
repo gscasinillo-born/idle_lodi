@@ -1,10 +1,13 @@
 import type { CoreStats, DerivedStats, EquipmentState, SaveData, StatKey } from "../data/types";
 import { deriveStats, expToNextLevel, STAT_POINTS_PER_LEVEL } from "../data/stats";
 import { createNewSave, loadSave, writeSave } from "../systems/SaveManager";
-import { EQUIPMENT_ITEMS, RARITY_UNLOCK_FLOOR, type EquipmentItem, type PotionItem } from "../data/shopItems";
+import { EQUIPMENT_ITEMS, POTIONS, RARITY_UNLOCK_FLOOR, type EquipmentItem, type PotionItem } from "../data/shopItems";
 
 const MAX_LOG_LINES = 40;
 const SAVE_INTERVAL_MS = 5000;
+// Auto-drink a potion once HP dips to this fraction of max, so the player doesn't
+// have to babysit the health bar during auto-battling.
+const AUTO_POTION_HP_THRESHOLD = 0.5;
 
 type Listener = () => void;
 
@@ -81,8 +84,23 @@ export class GameState {
 
   takeDamage(amount: number): boolean {
     this.data.hp = Math.max(0, this.data.hp - amount);
+    if (this.data.hp > 0) this.autoUsePotionIfNeeded();
     this.notify();
     return this.data.hp <= 0;
+  }
+
+  /** Auto-drinks a potion when HP is low and one is in stock — picks the smallest
+   * one that covers the deficit so a big potion isn't wasted on a small dip, falling
+   * back to the strongest potion on hand if nothing available is big enough. */
+  private autoUsePotionIfNeeded() {
+    const maxHp = this.derived.maxHp;
+    if (this.data.hp / maxHp > AUTO_POTION_HP_THRESHOLD) return;
+    const available = POTIONS.filter((p) => this.potionCount(p.id) > 0);
+    if (available.length === 0) return;
+    const deficit = maxHp - this.data.hp;
+    const sufficient = available.filter((p) => p.healAmount >= deficit).sort((a, b) => a.healAmount - b.healAmount);
+    const potion = sufficient[0] ?? [...available].sort((a, b) => b.healAmount - a.healAmount)[0];
+    this.usePotion(potion, true);
   }
 
   regen(deltaSeconds: number) {
@@ -150,13 +168,14 @@ export class GameState {
     return true;
   }
 
-  usePotion(potion: PotionItem): boolean {
+  usePotion(potion: PotionItem, auto = false): boolean {
     if (this.potionCount(potion.id) <= 0) return false;
     this.data.potions[potion.id] -= 1;
     const maxHp = this.derived.maxHp;
     const healed = Math.min(potion.healAmount, maxHp - this.data.hp);
     this.data.hp = Math.min(maxHp, this.data.hp + potion.healAmount);
-    this.addLog(`Used a ${potion.name}, restoring ${Math.floor(healed)} HP.`);
+    const prefix = auto ? "Auto-used" : "Used";
+    this.addLog(`${prefix} a ${potion.name}, restoring ${Math.floor(healed)} HP.`);
     return true;
   }
 
