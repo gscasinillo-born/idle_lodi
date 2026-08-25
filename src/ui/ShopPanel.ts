@@ -1,5 +1,5 @@
 import { GameState } from "../state/GameState";
-import { EQUIPMENT_ITEMS, POTION, RARITY_COLORS, type EquipmentItem } from "../data/shopItems";
+import { EQUIPMENT_ITEMS, POTIONS, RARITY_COLORS, type EquipmentItem } from "../data/shopItems";
 import type { EquipmentSlot } from "../data/types";
 
 const SLOTS: EquipmentSlot[] = ["weapon", "shield", "armor", "helmet", "accessory"];
@@ -24,34 +24,58 @@ export function mountShopPanel(root: HTMLElement, gameState: GameState) {
       <span class="shop-toggle-icon">▸</span>
     </div>
     <div class="shop-content">
-      <div class="shop-item-row">
-        <span>${POTION.name} — heals ${Math.round(POTION.healPercent * 100)}% HP</span>
-      </div>
-      <div class="shop-item-row">
-        <span id="potion-count"></span>
-        <div class="shop-actions">
-          <button id="buy-potion">Buy ${POTION.cost}g</button>
-          <button id="use-potion">Use</button>
-        </div>
-      </div>
+      <div id="potion-rows"></div>
       <div id="equipment-slots"></div>
     </div>
   `;
 
   const shopHeader = root.querySelector<HTMLDivElement>("#shop-toggle")!;
-  const potionCountEl = root.querySelector<HTMLSpanElement>("#potion-count")!;
-  const buyPotionBtn = root.querySelector<HTMLButtonElement>("#buy-potion")!;
-  const usePotionBtn = root.querySelector<HTMLButtonElement>("#use-potion")!;
+  const potionRowsEl = root.querySelector<HTMLDivElement>("#potion-rows")!;
   const equipmentSlotsEl = root.querySelector<HTMLDivElement>("#equipment-slots")!;
-
-  buyPotionBtn.onclick = () => gameState.buyPotion();
-  usePotionBtn.onclick = () => gameState.usePotion();
 
   // Collapse/expand only has a visible effect on the mobile layout (see
   // media query) — defaults to collapsed so the shop doesn't dominate the
   // small screen before the player scrolls to it.
   root.classList.add("collapsed");
   shopHeader.onclick = () => root.classList.toggle("collapsed");
+
+  const potionCountEls = new Map<string, HTMLSpanElement>();
+  const potionBuyBtnEls = new Map<string, HTMLButtonElement>();
+  const potionUseBtnEls = new Map<string, HTMLButtonElement>();
+
+  for (const potion of POTIONS) {
+    const row = document.createElement("div");
+    row.className = "shop-item-row";
+
+    const desc = document.createElement("span");
+    desc.className = "shop-item-desc";
+    const nameTag = document.createElement("span");
+    nameTag.style.color = potion.color;
+    nameTag.style.fontWeight = "bold";
+    nameTag.textContent = potion.name;
+    desc.append(nameTag, ` — heals ${potion.healAmount} HP`);
+
+    const countEl = document.createElement("span");
+    countEl.className = "shop-potion-count";
+
+    const buyBtn = document.createElement("button");
+    buyBtn.onclick = () => gameState.buyPotion(potion);
+
+    const useBtn = document.createElement("button");
+    useBtn.textContent = "Use";
+    useBtn.onclick = () => gameState.usePotion(potion);
+
+    const actions = document.createElement("div");
+    actions.className = "shop-actions";
+    actions.append(countEl, buyBtn, useBtn);
+
+    row.append(desc, actions);
+    potionRowsEl.appendChild(row);
+
+    potionCountEls.set(potion.id, countEl);
+    potionBuyBtnEls.set(potion.id, buyBtn);
+    potionUseBtnEls.set(potion.id, useBtn);
+  }
 
   const slotLabelEls = new Map<EquipmentSlot, HTMLSpanElement>();
   const equippedLabelEls = new Map<EquipmentSlot, HTMLSpanElement>();
@@ -107,9 +131,13 @@ export function mountShopPanel(root: HTMLElement, gameState: GameState) {
   }
 
   function render() {
-    potionCountEl.textContent = `Owned: ${gameState.potions}`;
-    buyPotionBtn.disabled = gameState.gold < POTION.cost;
-    usePotionBtn.disabled = gameState.potions <= 0;
+    for (const potion of POTIONS) {
+      const owned = gameState.potionCount(potion.id);
+      potionCountEls.get(potion.id)!.textContent = `x${owned}`;
+      potionBuyBtnEls.get(potion.id)!.disabled = gameState.gold < potion.cost;
+      potionBuyBtnEls.get(potion.id)!.textContent = `Buy ${potion.cost}g`;
+      potionUseBtnEls.get(potion.id)!.disabled = owned <= 0;
+    }
 
     for (const slot of SLOTS) {
       const equippedId = gameState.equipment[slot];

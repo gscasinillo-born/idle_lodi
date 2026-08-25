@@ -286,8 +286,16 @@ html, body {
 
 .shop-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-shrink: 0;
+}
+
+.shop-potion-count {
+  font-size: 11px;
+  color: #9b9bb8;
+  min-width: 24px;
+  text-align: right;
 }
 
 .shop-item-row button {

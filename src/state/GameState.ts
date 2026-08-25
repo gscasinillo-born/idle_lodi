@@ -1,7 +1,7 @@
 import type { CoreStats, DerivedStats, EquipmentState, SaveData, StatKey } from "../data/types";
 import { deriveStats, expToNextLevel, STAT_POINTS_PER_LEVEL } from "../data/stats";
 import { createNewSave, loadSave, writeSave } from "../systems/SaveManager";
-import { EQUIPMENT_ITEMS, POTION, RARITY_UNLOCK_FLOOR, type EquipmentItem } from "../data/shopItems";
+import { EQUIPMENT_ITEMS, RARITY_UNLOCK_FLOOR, type EquipmentItem, type PotionItem } from "../data/shopItems";
 
 const MAX_LOG_LINES = 40;
 const SAVE_INTERVAL_MS = 5000;
@@ -32,7 +32,7 @@ export class GameState {
   get stats(): CoreStats { return this.data.stats; }
   get hp() { return this.data.hp; }
   get log() { return this.data.log; }
-  get potions() { return this.data.potions; }
+  potionCount(potionId: string): number { return this.data.potions[potionId] ?? 0; }
   get equipment(): EquipmentState { return this.data.equipment; }
 
   /** Base stats plus whatever's currently equipped — this is what combat actually uses. */
@@ -142,20 +142,21 @@ export class GameState {
     return true;
   }
 
-  buyPotion(): boolean {
-    if (this.data.gold < POTION.cost) return false;
-    this.data.gold -= POTION.cost;
-    this.data.potions += 1;
-    this.addLog(`Bought a ${POTION.name}.`);
+  buyPotion(potion: PotionItem): boolean {
+    if (this.data.gold < potion.cost) return false;
+    this.data.gold -= potion.cost;
+    this.data.potions[potion.id] = (this.data.potions[potion.id] ?? 0) + 1;
+    this.addLog(`Bought a ${potion.name}.`);
     return true;
   }
 
-  usePotion(): boolean {
-    if (this.data.potions <= 0) return false;
-    this.data.potions -= 1;
-    const healed = Math.floor(this.derived.maxHp * POTION.healPercent);
-    this.data.hp = Math.min(this.derived.maxHp, this.data.hp + healed);
-    this.addLog(`Used a ${POTION.name}, restoring ${healed} HP.`);
+  usePotion(potion: PotionItem): boolean {
+    if (this.potionCount(potion.id) <= 0) return false;
+    this.data.potions[potion.id] -= 1;
+    const maxHp = this.derived.maxHp;
+    const healed = Math.min(potion.healAmount, maxHp - this.data.hp);
+    this.data.hp = Math.min(maxHp, this.data.hp + potion.healAmount);
+    this.addLog(`Used a ${potion.name}, restoring ${Math.floor(healed)} HP.`);
     return true;
   }
 

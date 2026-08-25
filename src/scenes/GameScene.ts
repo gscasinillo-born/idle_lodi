@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { GameState } from "../state/GameState";
-import { deriveStats } from "../data/stats";
+import { BASE_STAT_VALUE, deriveStats } from "../data/stats";
 import { generateFloorMonster, isBossFloor } from "../systems/FloorGenerator";
 import { BOSS_TEMPLATES, REGULAR_TEMPLATES } from "../data/monsterTemplates";
 import type { MonsterDefinition } from "../data/types";
@@ -34,6 +34,15 @@ const MONSTER_ANIM_SETS: AnimSets = {
 // and animated the same way — a missing file (e.g. no boss art yet) is caught
 // per-monster at spawn time via textures.exists(), not here.
 const ALL_MONSTER_TEMPLATES = [...REGULAR_TEMPLATES, ...BOSS_TEMPLATES];
+
+// AGI speeds up the attack swing itself (not just how often it triggers), scaling
+// from 1x at the base stat value up to 2x by 100 AGI — matches the same "AGI makes
+// you faster" read as attackIntervalMs, just applied to the animation's frame rate.
+const AGI_AT_MAX_ANIM_SPEED = 100;
+
+function attackAnimSpeedMultiplier(agi: number): number {
+  return Phaser.Math.Clamp(1 + (agi - BASE_STAT_VALUE) / (AGI_AT_MAX_ANIM_SPEED - BASE_STAT_VALUE), 1, 2);
+}
 
 interface Positioned {
   x: number;
@@ -142,7 +151,12 @@ export class GameScene extends Phaser.Scene {
 
   private playHeroAction(action: "attack" | "hurt") {
     const key = `hero-${action}-${HERO_FACING}`;
-    this.playerSprite.play(key);
+    if (action === "attack") {
+      const frameRate = HERO_ANIM_SETS.attack.rate * attackAnimSpeedMultiplier(this.gameState.effectiveStats.agi);
+      this.playerSprite.play({ key, frameRate });
+    } else {
+      this.playerSprite.play(key);
+    }
     this.playerSprite.once(`animationcomplete-${key}`, () => {
       this.playerSprite.play(`hero-walk-${HERO_FACING}`);
     });
@@ -152,7 +166,12 @@ export class GameScene extends Phaser.Scene {
     if (!this.monsterHasSprite) return;
     const monsterId = this.monster.id;
     const key = `${monsterId}-${action}-${MONSTER_FACING}`;
-    this.monsterSprite.play(key);
+    if (action === "attack") {
+      const frameRate = MONSTER_ANIM_SETS.attack.rate * attackAnimSpeedMultiplier(this.monster.stats.agi);
+      this.monsterSprite.play({ key, frameRate });
+    } else {
+      this.monsterSprite.play(key);
+    }
     this.monsterSprite.once(`animationcomplete-${key}`, () => {
       // A one-shot anim can outlive its monster (e.g. a killing blow right before
       // the next floor spawns) — don't stomp whatever's showing by then.
@@ -284,7 +303,9 @@ export class GameScene extends Phaser.Scene {
 
     const targetSprite = isPlayerAttacking ? this.monsterSprite : this.playerSprite;
 
-    const hitChance = Phaser.Math.Clamp((hit - targetFlee + 100) / 200, 0.15, 0.95);
+    // 75% baseline for an even matchup; a large hit/flee advantage should push this close
+    // to certain, not cap out in the 80s the way a flat +100/200 curve does at high levels.
+    const hitChance = Phaser.Math.Clamp(0.75 + (hit - targetFlee) / 150, 0.05, 0.99);
     const didHit = Math.random() < hitChance;
 
     if (!didHit) {

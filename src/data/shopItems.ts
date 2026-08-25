@@ -35,16 +35,17 @@ export interface PotionItem {
   id: string;
   name: string;
   cost: number;
-  /** Fraction of max HP restored per use. */
-  healPercent: number;
+  /** Flat HP restored per use — like RO's potions, this doesn't scale with max HP,
+   * so a cheap potion naturally stops mattering once you've leveled past it. */
+  healAmount: number;
+  color: string;
 }
 
-export const POTION: PotionItem = {
-  id: "minor-potion",
-  name: "Minor Potion",
-  cost: 15,
-  healPercent: 0.5,
-};
+export const POTIONS: PotionItem[] = [
+  { id: "red-potion", name: "Red Potion", cost: 12, healAmount: 60, color: "#eb5757" },
+  { id: "yellow-potion", name: "Yellow Potion", cost: 50, healAmount: 250, color: "#f2c94c" },
+  { id: "white-potion", name: "White Potion", cost: 150, healAmount: 600, color: "#f2f2f2" },
+];
 
 export const EQUIPMENT_ITEMS: EquipmentItem[] = [
   { id: "rusty-iron-sword", slot: "weapon", name: "Rusty Iron Sword", rarity: "Common", cost: 25, statBonus: { str: 2, dex: 1 } },

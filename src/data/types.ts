@@ -58,6 +58,7 @@ export interface SaveData {
   stats: CoreStats;
   hp: number;
   log: string[];
-  potions: number;
+  /** Owned count per potion id. */
+  potions: Record<string, number>;
   equipment: EquipmentState;
 }
