@@ -2,6 +2,8 @@ import { GameState } from "../state/GameState";
 import { EQUIPMENT_ITEMS, POTIONS, RARITY_COLORS, type EquipmentItem } from "../data/shopItems";
 import type { EquipmentSlot } from "../data/types";
 
+const BUY_QUANTITIES = [1, 5, 10, 20];
+
 const SLOTS: EquipmentSlot[] = ["weapon", "shield", "armor", "helmet", "accessory"];
 const SLOT_LABELS: Record<EquipmentSlot, string> = {
   weapon: "Weapon",
@@ -24,6 +26,12 @@ export function mountShopPanel(root: HTMLElement, gameState: GameState) {
       <span class="shop-toggle-icon">▸</span>
     </div>
     <div class="shop-content">
+      <div class="shop-qty-select">
+        <label for="potion-qty">Buy amount</label>
+        <select id="potion-qty">
+          ${BUY_QUANTITIES.map((n) => `<option value="${n}">x${n}</option>`).join("")}
+        </select>
+      </div>
       <div id="potion-rows"></div>
       <div id="equipment-slots"></div>
     </div>
@@ -32,12 +40,19 @@ export function mountShopPanel(root: HTMLElement, gameState: GameState) {
   const shopHeader = root.querySelector<HTMLDivElement>("#shop-toggle")!;
   const potionRowsEl = root.querySelector<HTMLDivElement>("#potion-rows")!;
   const equipmentSlotsEl = root.querySelector<HTMLDivElement>("#equipment-slots")!;
+  const potionQtySelect = root.querySelector<HTMLSelectElement>("#potion-qty")!;
 
   // Collapse/expand only has a visible effect on the mobile layout (see
   // media query) — defaults to collapsed so the shop doesn't dominate the
   // small screen before the player scrolls to it.
   root.classList.add("collapsed");
   shopHeader.onclick = () => root.classList.toggle("collapsed");
+
+  let buyQuantity = 1;
+  potionQtySelect.onchange = () => {
+    buyQuantity = Number(potionQtySelect.value);
+    render();
+  };
 
   const potionCountEls = new Map<string, HTMLSpanElement>();
   const potionBuyBtnEls = new Map<string, HTMLButtonElement>();
@@ -59,7 +74,7 @@ export function mountShopPanel(root: HTMLElement, gameState: GameState) {
     countEl.className = "shop-potion-count";
 
     const buyBtn = document.createElement("button");
-    buyBtn.onclick = () => gameState.buyPotion(potion);
+    buyBtn.onclick = () => gameState.buyPotion(potion, buyQuantity);
 
     const useBtn = document.createElement("button");
     useBtn.textContent = "Use";
@@ -133,9 +148,10 @@ export function mountShopPanel(root: HTMLElement, gameState: GameState) {
   function render() {
     for (const potion of POTIONS) {
       const owned = gameState.potionCount(potion.id);
+      const totalCost = potion.cost * buyQuantity;
       potionCountEls.get(potion.id)!.textContent = `x${owned}`;
-      potionBuyBtnEls.get(potion.id)!.disabled = gameState.gold < potion.cost;
-      potionBuyBtnEls.get(potion.id)!.textContent = `Buy ${potion.cost}g`;
+      potionBuyBtnEls.get(potion.id)!.disabled = gameState.gold < totalCost;
+      potionBuyBtnEls.get(potion.id)!.textContent = buyQuantity === 1 ? `Buy ${totalCost}g` : `Buy x${buyQuantity} (${totalCost}g)`;
       potionUseBtnEls.get(potion.id)!.disabled = owned <= 0;
     }
 

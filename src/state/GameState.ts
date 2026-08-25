@@ -146,29 +146,33 @@ export class GameState {
     this.notify();
   }
 
-  /** Manually step to a higher floor number — only within floors already cleared before. */
-  goUpFloor(): boolean {
-    if (this.data.floor >= this.data.maxFloorReached) return false;
-    this.data.floor += 1;
+  /** Manually step to a higher floor number — only within floors already cleared before.
+   * Clamped to whatever's actually available, so a "+20" past the edge just goes as far as it can. */
+  goUpFloor(steps = 1): boolean {
+    const target = Math.min(this.data.maxFloorReached, this.data.floor + steps);
+    if (target <= this.data.floor) return false;
+    this.data.floor = target;
     this.addLog(`Moved up to floor ${this.data.floor}.`);
     this.floorJumpListeners.forEach((l) => l("down"));
     return true;
   }
 
   /** Manually step to a lower floor number — always allowed since it's already been passed through. */
-  goDownFloor(): boolean {
-    if (this.data.floor <= 1) return false;
-    this.data.floor -= 1;
+  goDownFloor(steps = 1): boolean {
+    const target = Math.max(1, this.data.floor - steps);
+    if (target >= this.data.floor) return false;
+    this.data.floor = target;
     this.addLog(`Moved down to floor ${this.data.floor}.`);
     this.floorJumpListeners.forEach((l) => l("up"));
     return true;
   }
 
-  buyPotion(potion: PotionItem): boolean {
-    if (this.data.gold < potion.cost) return false;
-    this.data.gold -= potion.cost;
-    this.data.potions[potion.id] = (this.data.potions[potion.id] ?? 0) + 1;
-    this.addLog(`Bought a ${potion.name}.`);
+  buyPotion(potion: PotionItem, quantity = 1): boolean {
+    const totalCost = potion.cost * quantity;
+    if (this.data.gold < totalCost) return false;
+    this.data.gold -= totalCost;
+    this.data.potions[potion.id] = (this.data.potions[potion.id] ?? 0) + quantity;
+    this.addLog(quantity === 1 ? `Bought a ${potion.name}.` : `Bought ${quantity}x ${potion.name}.`);
     return true;
   }
 

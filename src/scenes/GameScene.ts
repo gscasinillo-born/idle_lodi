@@ -42,6 +42,10 @@ function attackAnimSpeedMultiplier(agi: number): number {
   return Phaser.Math.Clamp(1 + (agi - BASE_STAT_VALUE) / (AGI_AT_MAX_ANIM_SPEED - BASE_STAT_VALUE), 1, 2);
 }
 
+// Regular floors throw multiple monsters at you in sequence before the floor advances;
+// boss floors stay a single boss fight, same as before.
+const FLOOR_MONSTER_COUNT = 3;
+
 // Idle wandering is a leisurely stroll; an attack lunge is a quick, fixed-duration step
 // in and back regardless of distance, so it always reads as a snappy strike.
 const WANDER_SPEED_PX_PER_SEC = 45;
@@ -77,6 +81,10 @@ export class GameScene extends Phaser.Scene {
   private playerAttackAcc = 0;
   private monsterAttackAcc = 0;
   private combatOver = false;
+  // A regular floor queues up several monsters in a row before the floor number
+  // advances; a boss floor is always just the one boss.
+  private floorMonsterIndex = 0;
+  private floorMonsterTotal = 1;
 
   private playerSprite!: Phaser.GameObjects.Sprite;
   private monsterSprite!: Phaser.GameObjects.Sprite;
@@ -116,7 +124,7 @@ export class GameScene extends Phaser.Scene {
       this.load.spritesheet(template.id, `/sprites/monsters/${template.id}.png`, { frameWidth: size, frameHeight: size });
     }
     // A monster template with no art file yet (e.g. a boss before its sprite is added)
-    // 404s harmlessly here — spawnFloor() falls back to a generated blob for it.
+    // 404s harmlessly here — spawnMonster() falls back to a generated blob for it.
     this.load.on("loaderror", (file: { key: string }) => {
       console.warn(`No sprite sheet found for "${file.key}" — falling back to a blob.`);
     });
@@ -164,7 +172,7 @@ export class GameScene extends Phaser.Scene {
       color: "#cfd8ff",
     }).setOrigin(0.5);
 
-    // Placeholder texture — spawnFloor() below swaps it to the real monster texture before the first render.
+    // Placeholder texture — beginFloor() below swaps it to the real monster texture before the first render.
     this.monsterSprite = this.add.sprite(this.monsterRest.x, this.monsterRest.y, "hero", BOOTSTRAP_FRAME);
     this.monsterHpBar = this.add.graphics();
     this.monsterNameText = this.add.text(this.monsterRest.x, this.monsterRest.y + PLAYER_RADIUS + 18, "", {
@@ -173,12 +181,20 @@ export class GameScene extends Phaser.Scene {
       color: "#ffd8d8",
     }).setOrigin(0.5);
 
-    this.spawnFloor();
+    this.beginFloor();
     this.scheduleWander("player");
     this.scheduleWander("monster");
 
     this.gameState.onChange(() => this.refreshBars());
-    this.gameState.onFloorJump((direction) => this.playFloorTransition(direction, () => this.spawnFloor()));
+    this.gameState.onFloorJump((direction) => this.playFloorTransition(direction, () => this.beginFloor()));
+  }
+
+  /** Called whenever the floor NUMBER changes (manual jump, or advancing/retreating
+   * after combat) — resets the monster queue for the new floor and spawns the first one. */
+  private beginFloor() {
+    this.floorMonsterIndex = 0;
+    this.floorMonsterTotal = isBossFloor(this.gameState.floor) ? 1 : FLOOR_MONSTER_COUNT;
+    this.spawnMonster();
   }
 
   /** Plays the hero's walk-up/walk-down animation before handing off to the next floor's encounter. */
@@ -325,7 +341,8 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private spawnFloor() {
+  /** Spawns the next monster in the current floor's queue (not a floor change by itself). */
+  private spawnMonster() {
     this.combatOver = false;
     this.playerAttackAcc = 0;
     this.monsterAttackAcc = 0;
@@ -376,10 +393,11 @@ export class GameScene extends Phaser.Scene {
     this.monsterSprite.setDisplaySize(radius * 2, radius * 2);
 
     this.monsterNameText.setText(`${this.monster.name} (Lv.${this.monster.level})`);
-    this.floorText.setText(`Floor ${this.gameState.floor}`);
+    const progress = this.floorMonsterTotal > 1 ? ` (${this.floorMonsterIndex + 1}/${this.floorMonsterTotal})` : "";
+    this.floorText.setText(`Floor ${this.gameState.floor}${progress}`);
     this.bossBanner.setText(isBossFloor(this.gameState.floor) ? "⚔ BOSS FLOOR ⚔" : "");
 
-    this.gameState.addLog(`Floor ${this.gameState.floor}: a ${this.monster.name} appears.`);
+    this.gameState.addLog(`Floor ${this.gameState.floor}: a ${this.monster.name} appears.${progress}`);
     this.refreshBars();
   }
 
@@ -529,7 +547,9 @@ export class GameScene extends Phaser.Scene {
     const { leveledUp } = this.gameState.gainRewards(this.monster.expReward, this.monster.goldReward);
     this.gameState.addLog(`Defeated ${this.monster.name}! +${this.monster.expReward} EXP, +${this.monster.goldReward} gold.`);
     if (leveledUp) this.gameState.addLog(`Level up! You are now level ${this.gameState.level}.`);
-    this.gameState.advanceFloor();
+
+    const isLastOnFloor = this.floorMonsterIndex + 1 >= this.floorMonsterTotal;
+    if (isLastOnFloor) this.gameState.advanceFloor();
     this.gameState.persist();
 
     const monsterId = this.monster.id;
@@ -537,7 +557,8 @@ export class GameScene extends Phaser.Scene {
     this.monsterBusy = true;
     // Let the killing blow's hurt animation finish naturally first (~400ms), then have the
     // monster flee off the top of the screen (its otherwise-unused "up" row, plus an actual
-    // upward step) while the hero presses on deeper ("down").
+    // upward step) while the hero presses on deeper ("down") — only once the floor's whole
+    // monster queue is cleared; otherwise the next one in the queue steps right up.
     this.time.delayedCall(420, () => {
       if (this.monster.id === monsterId) {
         if (hasSprite) this.setFacing("monster", "up");
@@ -549,7 +570,12 @@ export class GameScene extends Phaser.Scene {
           ease: "Sine.easeIn",
         });
       }
-      this.playFloorTransition("down", () => this.spawnFloor());
+      if (isLastOnFloor) {
+        this.playFloorTransition("down", () => this.beginFloor());
+      } else {
+        this.floorMonsterIndex += 1;
+        this.time.delayedCall(400, () => this.spawnMonster());
+      }
     });
   }
 
@@ -559,6 +585,6 @@ export class GameScene extends Phaser.Scene {
     this.gameState.retreatFloor();
     this.gameState.fullHeal();
     this.gameState.persist();
-    this.time.delayedCall(800, () => this.playFloorTransition("up", () => this.spawnFloor()));
+    this.time.delayedCall(800, () => this.playFloorTransition("up", () => this.beginFloor()));
   }
 }

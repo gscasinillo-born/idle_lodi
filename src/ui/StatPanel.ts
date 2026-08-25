@@ -1,6 +1,8 @@
 import { GameState } from "../state/GameState";
 import type { StatKey } from "../data/types";
 
+const FLOOR_STEPS = [1, 5, 10, 20];
+
 const STAT_LABELS: { key: StatKey; label: string; description: string }[] = [
   { key: "str", label: "STR", description: "Raises your attack power — deal more damage per hit." },
   { key: "agi", label: "AGI", description: "Raises attack speed and your chance to dodge enemy attacks." },
@@ -20,6 +22,12 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
         <span id="floor-label"></span>
         <button id="floor-up">Up</button>
       </div>
+      <div class="floor-step-select">
+        <label for="floor-step">Move by</label>
+        <select id="floor-step">
+          ${FLOOR_STEPS.map((n) => `<option value="${n}">${n}</option>`).join("")}
+        </select>
+      </div>
     </div>
     <div class="panel-section">
       <h2>Stats <span id="stat-points"></span></h2>
@@ -38,9 +46,16 @@ export function mountStatPanel(root: HTMLElement, gameState: GameState) {
   const floorLabelEl = root.querySelector<HTMLSpanElement>("#floor-label")!;
   const floorDownBtn = root.querySelector<HTMLButtonElement>("#floor-down")!;
   const floorUpBtn = root.querySelector<HTMLButtonElement>("#floor-up")!;
+  const floorStepSelect = root.querySelector<HTMLSelectElement>("#floor-step")!;
 
-  floorDownBtn.onclick = () => gameState.goDownFloor();
-  floorUpBtn.onclick = () => gameState.goUpFloor();
+  let floorStep = 1;
+  floorStepSelect.onchange = () => {
+    floorStep = Number(floorStepSelect.value);
+    render();
+  };
+
+  floorDownBtn.onclick = () => gameState.goDownFloor(floorStep);
+  floorUpBtn.onclick = () => gameState.goUpFloor(floorStep);
 
   // Built once and updated in place — rebuilding these nodes on every state
   // change (e.g. the per-frame regen tick) can drop a click that lands
