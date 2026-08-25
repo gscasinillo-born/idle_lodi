@@ -10,13 +10,17 @@ const SAVE_INTERVAL_MS = 5000;
 const AUTO_POTION_HP_THRESHOLD = 0.5;
 
 type Listener = () => void;
+// "down" = descending deeper into the pit (floor number increases), "up" = climbing back
+// toward the surface (floor number decreases) — lets GameScene play the matching walk
+// animation instead of just teleporting to the next floor's encounter.
+type FloorJumpListener = (direction: "up" | "down") => void;
 
 export class GameState {
   private data: SaveData;
   private listeners: Listener[] = [];
   // Separate from onChange: only fires for manual floor navigation, so GameScene can
   // respawn the encounter immediately without disturbing the paced delay used after combat.
-  private floorJumpListeners: Listener[] = [];
+  private floorJumpListeners: FloorJumpListener[] = [];
   private saveTimer = 0;
 
   constructor() {
@@ -60,7 +64,7 @@ export class GameState {
     return () => { this.listeners = this.listeners.filter((l) => l !== listener); };
   }
 
-  onFloorJump(listener: Listener): () => void {
+  onFloorJump(listener: FloorJumpListener): () => void {
     this.floorJumpListeners.push(listener);
     return () => { this.floorJumpListeners = this.floorJumpListeners.filter((l) => l !== listener); };
   }
@@ -147,7 +151,7 @@ export class GameState {
     if (this.data.floor >= this.data.maxFloorReached) return false;
     this.data.floor += 1;
     this.addLog(`Moved up to floor ${this.data.floor}.`);
-    this.floorJumpListeners.forEach((l) => l());
+    this.floorJumpListeners.forEach((l) => l("down"));
     return true;
   }
 
@@ -156,7 +160,7 @@ export class GameState {
     if (this.data.floor <= 1) return false;
     this.data.floor -= 1;
     this.addLog(`Moved down to floor ${this.data.floor}.`);
-    this.floorJumpListeners.forEach((l) => l());
+    this.floorJumpListeners.forEach((l) => l("up"));
     return true;
   }
 
