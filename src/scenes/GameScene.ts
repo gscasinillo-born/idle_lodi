@@ -303,9 +303,10 @@ export class GameScene extends Phaser.Scene {
 
     const targetSprite = isPlayerAttacking ? this.monsterSprite : this.playerSprite;
 
-    // 75% baseline for an even matchup; a large hit/flee advantage should push this close
-    // to certain, not cap out in the 80s the way a flat +100/200 curve does at high levels.
-    const hitChance = Phaser.Math.Clamp(0.75 + (hit - targetFlee) / 150, 0.05, 0.99);
+    // 75% baseline for an even matchup; hit/flee gaps in this system are typically only
+    // in the tens (not hundreds), so a small divisor is needed for a real stat/level
+    // advantage to actually swing the odds instead of barely nudging off the baseline.
+    const hitChance = Phaser.Math.Clamp(0.75 + (hit - targetFlee) / 50, 0.05, 0.99);
     const didHit = Math.random() < hitChance;
 
     if (!didHit) {
